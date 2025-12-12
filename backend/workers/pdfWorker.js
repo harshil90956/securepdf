@@ -117,7 +117,7 @@ async function startWorkers(role = 'render-merge') {
   if (role === 'render' || role === 'render-merge') {
     // Worker 1: per-page rendering
     // eslint-disable-next-line no-new
-    new Worker(
+    const renderWorker = new Worker(
       OUTPUT_PDF_QUEUE_NAME,
       async (job) => {
       const { email, assignedQuota, pageLayout, pageIndex, adminUserId, jobId } = job.data || {};
@@ -187,12 +187,21 @@ async function startWorkers(role = 'render-merge') {
         concurrency: 1,
       }
     );
+
+    renderWorker.on('failed', (job, err) => {
+      console.error(
+        '[pdfWorker] Render worker failed',
+        job?.id,
+        job?.data?.jobId,
+        err
+      );
+    });
   }
 
   if (role === 'merge' || role === 'render-merge') {
     // Worker 2: merge final PDF
     // eslint-disable-next-line no-new
-    new Worker(
+    const mergeWorker = new Worker(
       MERGE_PDF_QUEUE_NAME,
       async (job) => {
       const { jobId, email, assignedQuota, adminUserId } = job.data || {};
@@ -287,6 +296,15 @@ async function startWorkers(role = 'render-merge') {
         concurrency: 1,
       }
     );
+
+    mergeWorker.on('failed', (job, err) => {
+      console.error(
+        '[pdfWorker] Merge worker failed',
+        job?.id,
+        job?.data?.jobId,
+        err
+      );
+    });
   }
 
   console.log(`[pdfWorker] ${role} worker started, listening for jobs...`);
