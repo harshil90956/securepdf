@@ -155,7 +155,17 @@ router.post('/generate', authMiddleware, requireAdmin, async (req, res) => {
 
     return res.status(201).json({ jobId: jobDoc._id, pdf_s3_key, engine_metrics });
   } catch (err) {
-    return res.status(500).json({ message: err?.message || 'Vector PDF generation failed' });
+    const statusCode = Number.isFinite(Number(err?.statusCode)) ? Number(err.statusCode) : 500;
+    const message = err?.message || 'Vector PDF generation failed';
+    console.error('[VECTOR_GENERATE_ERROR]', {
+      statusCode,
+      message,
+      stack: err?.stack,
+    });
+    return res.status(statusCode).json({
+      message,
+      statusCode,
+    });
   }
 });
 

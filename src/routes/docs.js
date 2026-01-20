@@ -338,13 +338,30 @@ router.post('/upload', authMiddleware, upload.single('file'), async (req, res) =
   } catch (err) {
     console.error('Docs upload error', err);
     const msg = err instanceof Error ? err.message : '';
-    if (
-      typeof msg === 'string' &&
-      (msg.startsWith('INKSCAPE_NOT_FOUND:') || msg.startsWith('INKSCAPE_UNAVAILABLE:'))
-    ) {
-      return res.status(503).json({ message: msg });
+    const statusFromAws = Number.isFinite(Number(err?.$metadata?.httpStatusCode)) ? Number(err.$metadata.httpStatusCode) : null;
+    const codeFromAws = typeof err?.name === 'string' && err.name.trim() ? err.name.trim() : null;
+
+    if (typeof msg === 'string' && (msg.startsWith('INKSCAPE_NOT_FOUND:') || msg.startsWith('INKSCAPE_UNAVAILABLE:'))) {
+      return res.status(503).json({ message: msg, statusCode: 503 });
     }
-    return res.status(500).json({ message: 'Internal server error' });
+
+    if (typeof msg === 'string' && (msg.includes('S3_BUCKET not configured') || msg.includes('S3_REGION') || msg.includes('S3_ACCESS_KEY_ID') || msg.includes('S3_SECRET_ACCESS_KEY') || msg.includes('S3_ENDPOINT'))) {
+      return res.status(500).json({ message: msg, statusCode: 500 });
+    }
+
+    if (statusFromAws && statusFromAws >= 400 && statusFromAws < 600) {
+      return res.status(statusFromAws).json({
+        message: msg || 'S3 operation failed',
+        statusCode: statusFromAws,
+        code: codeFromAws,
+      });
+    }
+
+    return res.status(500).json({
+      message: msg || 'Internal server error',
+      statusCode: 500,
+      code: codeFromAws,
+    });
   }
 });
 
