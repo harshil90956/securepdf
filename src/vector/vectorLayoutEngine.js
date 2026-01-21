@@ -1092,9 +1092,14 @@ export class VectorLayoutEngine {
         const seriesNumber = seriesConfig.start + (globalIdx * seriesConfig.step);
         const padLength = Number(seriesConfig.padLength || 0);
         const prefix = typeof seriesConfig.prefix === 'string' ? seriesConfig.prefix : '';
+        const rawDigits = String(seriesNumber);
         const seriesValue = padLength > 0
-          ? `${prefix}${String(seriesNumber).padStart(padLength, '0')}`
-          : `${prefix}${String(seriesNumber)}`;
+          ? (() => {
+              const padded = rawDigits.padStart(padLength, '0');
+              const finalDigits = padded.length > padLength ? padded.slice(padded.length - padLength) : padded;
+              return `${prefix}${finalDigits}`;
+            })()
+          : `${prefix}${rawDigits}`;
         
         const xRatio = Number(slot.xRatio);
         const yRatio = Number(slot.yRatio);
