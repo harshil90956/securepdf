@@ -5,6 +5,7 @@ import Redis from 'ioredis';
 import { setRedisConnection, connection } from '../queues/vectorQueue.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import cors from 'cors';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -16,33 +17,26 @@ if (!process.env.JOB_PAYLOAD_HMAC_SECRET) {
 
 const app = express();
 const PORT = process.env.PORT || 8000;
-app.use((req, res, next) => {
-  const origin = req.headers.origin;
+const corsAllowlist = String(process.env.CORS_ORIGINS || '')
+  .split(',')
+  .map((s) => s.trim())
+  .filter(Boolean);
 
-  // If request has an Origin header, reflect it back
-  if (origin) {
-    res.header('Access-Control-Allow-Origin', origin);
-    res.header('Vary', 'Origin');
-  }
+const corsOptions = {
+  origin(origin, cb) {
+    if (!origin) return cb(null, true);
+    if (corsAllowlist.length === 0) return cb(null, true);
+    return cb(null, corsAllowlist.includes(origin));
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Authorization', 'X-Session-Token'],
+  exposedHeaders: ['X-Source-Key'],
+  maxAge: 86400,
+};
 
-  res.header('Access-Control-Allow-Credentials', 'true');
-  res.header(
-    'Access-Control-Allow-Headers',
-    'Origin, X-Requested-With, Content-Type, Accept, Authorization, X-Session-Token'
-  );
-  res.header(
-    'Access-Control-Allow-Methods',
-    'GET, POST, PUT, PATCH, DELETE, OPTIONS'
-  );
-  res.header('Access-Control-Expose-Headers', 'X-Source-Key');
-
-  // Handle preflight
-  if (req.method === 'OPTIONS') {
-    return res.status(204).end();
-  }
-
-  next();
-});
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
 
 const BODY_LIMIT = process.env.BODY_LIMIT || '500mb';
 
