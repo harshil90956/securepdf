@@ -1,4 +1,4 @@
-export async function renderViaPrintEngine({ job_id, svg_s3_key, object_mm, series, custom_fonts, overlays, render_mode, traceId }) {
+export async function renderViaPrintEngine({ job_id, svg_s3_key, object_mm, series, series_list, custom_fonts, overlays, render_mode, traceId }) {
   const baseUrl = String(process.env.PRINT_ENGINE_URL || '').trim();
   if (!baseUrl) {
     throw new Error('PRINT_ENGINE_URL not configured');
@@ -15,7 +15,8 @@ export async function renderViaPrintEngine({ job_id, svg_s3_key, object_mm, seri
     job_id,
     svg_s3_key,
     object_mm,
-    series,
+    ...(series ? { series } : {}),
+    ...(Array.isArray(series_list) ? { series_list } : {}),
     ...(Array.isArray(custom_fonts) ? { custom_fonts } : {}),
     ...(Array.isArray(overlays) ? { overlays } : {}),
     ...(typeof render_mode === 'string' && render_mode.trim() ? { render_mode: render_mode.trim() } : {}),

@@ -19,6 +19,7 @@ router.post('/generate', authMiddleware, requireAdmin, async (req, res) => {
     const job_id = typeof body.job_id === 'string' ? body.job_id.trim() : '';
     const svg_s3_key = typeof body.svg_s3_key === 'string' ? body.svg_s3_key.trim() : '';
     const series = body.series && typeof body.series === 'object' ? body.series : null;
+    const series_list = Array.isArray(body.series_list) ? body.series_list : null;
     const object_mm = body.object_mm && typeof body.object_mm === 'object' ? body.object_mm : null;
     const custom_fonts = Array.isArray(body.custom_fonts) ? body.custom_fonts : null;
     const overlays = Array.isArray(body.overlays) ? body.overlays : null;
@@ -31,47 +32,67 @@ router.post('/generate', authMiddleware, requireAdmin, async (req, res) => {
     if (!svg_s3_key) {
       return res.status(400).json({ message: 'svg_s3_key is required' });
     }
-    if (!series) {
-      return res.status(400).json({ message: 'series is required' });
+    if (!series && !series_list) {
+      return res.status(400).json({ message: 'series or series_list is required' });
     }
 
-    const anchorSpace = typeof series.anchor_space === 'string' ? String(series.anchor_space).trim().toLowerCase() : '';
-    const xMm = Number(series.x_mm);
-    const yMm = Number(series.y_mm);
-    const fontFamily = typeof series.font_family === 'string' ? String(series.font_family).trim() : '';
-    const fontSizeMm = Number(series.font_size_mm);
-    const perLetterFontSizeMm = series.per_letter_font_size_mm;
-    const letterSpacingMm = Number(series.letter_spacing_mm);
-    const seriesRotationDeg = Number(series.rotation_deg);
-    const seriesColor = typeof series.color === 'string' ? String(series.color).trim() : '';
-    const hasDisallowed =
-      series.x_ratio !== undefined ||
-      series.y_ratio !== undefined ||
-      series.x_svg !== undefined ||
-      series.y_svg !== undefined ||
-      series.font !== undefined ||
-      series.per_letter !== undefined;
+    const validateSeries = (s) => {
+      if (!s || typeof s !== 'object') return { ok: false, message: 'series item must be an object' };
+      const anchorSpace = typeof s.anchor_space === 'string' ? String(s.anchor_space).trim().toLowerCase() : '';
+      const xMm = Number(s.x_mm);
+      const yMm = Number(s.y_mm);
+      const fontFamily = typeof s.font_family === 'string' ? String(s.font_family).trim() : '';
+      const fontSizeMm = Number(s.font_size_mm);
+      const perLetterFontSizeMm = s.per_letter_font_size_mm;
+      const letterSpacingMm = Number(s.letter_spacing_mm);
+      const seriesRotationDeg = Number(s.rotation_deg);
+      const seriesColor = typeof s.color === 'string' ? String(s.color).trim() : '';
+      const hasDisallowed =
+        s.x_ratio !== undefined ||
+        s.y_ratio !== undefined ||
+        s.x_svg !== undefined ||
+        s.y_svg !== undefined ||
+        s.font !== undefined ||
+        s.per_letter !== undefined;
 
-    const perLetterOk =
-      perLetterFontSizeMm === undefined ||
-      (Array.isArray(perLetterFontSizeMm) && perLetterFontSizeMm.every((v) => Number.isFinite(Number(v)) && Number(v) > 0));
+      const perLetterOk =
+        perLetterFontSizeMm === undefined ||
+        (Array.isArray(perLetterFontSizeMm) && perLetterFontSizeMm.every((v) => Number.isFinite(Number(v)) && Number(v) > 0));
 
-    if (
-      anchorSpace !== 'object_mm' ||
-      !Number.isFinite(xMm) ||
-      !Number.isFinite(yMm) ||
-      !fontFamily ||
-      !Number.isFinite(fontSizeMm) ||
-      !(fontSizeMm > 0) ||
-      !perLetterOk ||
-      !Number.isFinite(letterSpacingMm) ||
-      !Number.isFinite(seriesRotationDeg) ||
-      !seriesColor ||
-      hasDisallowed
-    ) {
-      return res
-        .status(400)
-        .json({ message: 'series must use anchor_space="object_mm" with x_mm/y_mm, font_family, font_size_mm, optional per_letter_font_size_mm, letter_spacing_mm, rotation_deg, color (no x_ratio/y_ratio/x_svg/y_svg, no font, no per_letter)' });
+      if (
+        anchorSpace !== 'object_mm' ||
+        !Number.isFinite(xMm) ||
+        !Number.isFinite(yMm) ||
+        !fontFamily ||
+        !Number.isFinite(fontSizeMm) ||
+        !(fontSizeMm > 0) ||
+        !perLetterOk ||
+        !Number.isFinite(letterSpacingMm) ||
+        !Number.isFinite(seriesRotationDeg) ||
+        !seriesColor ||
+        hasDisallowed
+      ) {
+        return {
+          ok: false,
+          message:
+            'series must use anchor_space="object_mm" with x_mm/y_mm, font_family, font_size_mm, optional per_letter_font_size_mm, letter_spacing_mm, rotation_deg, color (no x_ratio/y_ratio/x_svg/y_svg, no font, no per_letter)',
+        };
+      }
+      return { ok: true };
+    };
+
+    if (series) {
+      const v = validateSeries(series);
+      if (!v.ok) return res.status(400).json({ message: v.message });
+    }
+    if (series_list) {
+      if (!series_list.length) {
+        return res.status(400).json({ message: 'series_list must contain at least one item' });
+      }
+      for (const s of series_list) {
+        const v = validateSeries(s);
+        if (!v.ok) return res.status(400).json({ message: v.message });
+      }
     }
 
     const createdAt = new Date();
@@ -90,6 +111,7 @@ router.post('/generate', authMiddleware, requireAdmin, async (req, res) => {
         svg_s3_key,
         object_mm,
         series,
+        series_list,
         render_mode,
         outputKey,
       },
@@ -114,6 +136,7 @@ router.post('/generate', authMiddleware, requireAdmin, async (req, res) => {
       svg_s3_key,
       object_mm,
       series,
+      series_list,
       custom_fonts,
       overlays,
       render_mode,
