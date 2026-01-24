@@ -19,7 +19,11 @@ router.post('/generate', authMiddleware, requireAdmin, async (req, res) => {
     const job_id = typeof body.job_id === 'string' ? body.job_id.trim() : '';
     const svg_s3_key = typeof body.svg_s3_key === 'string' ? body.svg_s3_key.trim() : '';
     const series = body.series && typeof body.series === 'object' ? body.series : null;
-    const series_list = Array.isArray(body.series_list) ? body.series_list : null;
+    const series_list = Array.isArray(body.series_list)
+      ? body.series_list
+      : Array.isArray(body.seriesList)
+        ? body.seriesList
+        : null;
     const object_mm = body.object_mm && typeof body.object_mm === 'object' ? body.object_mm : null;
     const custom_fonts = Array.isArray(body.custom_fonts) ? body.custom_fonts : null;
     const overlays = Array.isArray(body.overlays) ? body.overlays : null;
